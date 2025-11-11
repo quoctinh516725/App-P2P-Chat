@@ -33,7 +33,7 @@ class PeerNode:
         self.running = False
         self.ui_on_message = ui_on_message
         self.ui_on_status = ui_on_status
-<<<<<<< Updated upstream
+
 
     def start_listening(self, host='0.0.0.0', port=5555):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -56,8 +56,6 @@ class PeerNode:
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.conn.connect((ip, port))
         self.ui_on_status(f"Connected to {ip}:{port}")
-=======
->>>>>>> Stashed changes
         self.running = True
         threading.Thread(target=self._recv_loop, daemon=True).start()
     def start_listening(self, ip, port):
@@ -173,8 +171,7 @@ class PeerNode:
                 self.server_sock.close()
         except:
             pass
-<<<<<<< Updated upstream
-=======
+
         # close all connections
         with self.lock:
             conns = list(self.connections.values())
@@ -185,4 +182,3 @@ class PeerNode:
             except:
                 pass
         self.ui_on_status("Node closed")
->>>>>>> Stashed changes
