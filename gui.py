@@ -93,7 +93,7 @@ class ChatGUI:
             messagebox.showerror("Error", str(e))
 
     def connect_peer(self):
-<<<<<<< Updated upstream
+
         try:
             self.node.connect_to(self.ip_var.get(), self.port_var.get())
         except Exception as e:
@@ -164,7 +164,7 @@ class ChatGUI:
         except Exception as e:
             messagebox.showwarning("Warning", str(e))
 
-<<<<<<< Updated upstream
+
     def on_message(self, msg: dict):
         if msg.get("type") == "msg":
             self.append_chat(f"Peer: {msg.get('text','')}")
@@ -175,7 +175,7 @@ class ChatGUI:
         self.append_chat(f"[Status] {text}")
 
     def append_chat(self, line):
-=======
+
     # these are scheduled on main thread via safe wrappers in __init__
     def _on_message_ui(self, msg: dict, conn):
         # show: Peer {id} (ip:port): text
