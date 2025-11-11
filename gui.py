@@ -1,21 +1,18 @@
 import tkinter as tk
-<<<<<<< Updated upstream
 from tkinter import scrolledtext, messagebox
 from network import PeerNode
-=======
+
 from tkinter import messagebox, scrolledtext
 import socket   
 from network import PeerNode     # Assuming network.py contains P2PNetwork class
->>>>>>> Stashed changes
 
 class ChatGUI:
     def __init__(self, root):
         self.root = root
-<<<<<<< Updated upstream
         self.root.title("P2P Chat - No Server")
         self.node = PeerNode(self.on_message, self.on_status)
 
-=======
+
         self.root.title("P2P Chat-No Server (multi-peer)")
         def safe_on_message(msg):
             self.root.after(0, lambda: self.on_message(msg))
@@ -23,7 +20,7 @@ class ChatGUI:
             self.root.after(0, lambda: self.on_status(status))
         self.node = PeerNode(safe_on_message, safe_on_status)
         
->>>>>>> Stashed changes
+
         top = tk.Frame(root); top.pack(padx=8, pady=8, fill='x')
         tk.Label(top, text="Peer IP:").pack(side='left')
         self.ip_var = tk.StringVar(value="127.0.0.1")
@@ -34,9 +31,7 @@ class ChatGUI:
 
         tk.Button(top, text="Start Listening", command=self.start_listen).pack(side='left', padx=6)
         tk.Button(top, text="Connect", command=self.connect_peer).pack(side='left', padx=6)
-<<<<<<< Updated upstream
 
-=======
         
         middle = tk.Frame(root); middle.pack(padx=8, pady=4, fill='both', expand=True)
         #Peer list
@@ -51,14 +46,14 @@ class ChatGUI:
         tk.Button(peer_btn_frame, text="Disconnect", command=self.disconnect_peer).pack(fill= 'x', pady=4)
         tk.Button(peer_btn_frame, text="Send -> Selected", command=lambda:self.send_to_selected).pack(fill='x')
         #Chat  window
->>>>>>> Stashed changes
+
         self.chat = scrolledtext.ScrolledText(root, state='disabled', wrap='word', height=18)
         self.chat.pack(padx=8, pady=8, fill='both', expand=True)
 
         bottom = tk.Frame(root); bottom.pack(padx=8, pady=8, fill='x')
         self.entry = tk.Entry(bottom)
         self.entry.pack(side='left', fill='x', expand=True)
-<<<<<<< Updated upstream
+
         self.entry.bind("<Return>", self.send_msg)
         tk.Button(bottom, text="Send", command=self.send_msg).pack(side='left', padx=6)
 
@@ -67,7 +62,7 @@ class ChatGUI:
     def start_listen(self):
         try:
             self.node.start_listening(port=self.port_var.get())
-=======
+
         self.entry.bind("<Return>", lambda e: self.send_msg(to_selected=False))
         tk.Button(bottom, text="Send -> All", command=lambda: self.send_msg(to_selected=False)).pack(side='left', padx=6)
 
@@ -94,7 +89,6 @@ class ChatGUI:
         try:
             self.node.start_listening(host='0.0.0.0', port=self.port_var.get())
             self.refresh_peers()
->>>>>>> Stashed changes
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -111,7 +105,6 @@ class ChatGUI:
         try:
             self.node.send_text(text)
             self.append_chat(f"Me: {text}")
-=======
         ip = self.ip_var.get()
         port = self.port_var.get()
         try:
@@ -167,7 +160,6 @@ class ChatGUI:
             else:
                 sent = self.node.send_text(text, target_id=None)
                 self._append_chat(f"Me -> ALL: {text}")
->>>>>>> Stashed changes
             self.entry.delete(0, 'end')
         except Exception as e:
             messagebox.showwarning("Warning", str(e))
@@ -197,26 +189,24 @@ class ChatGUI:
         self.refresh_peers()
 
     def _append_chat(self, line):
->>>>>>> Stashed changes
+
         self.chat.configure(state='normal')
         self.chat.insert('end', line + "\n")
         self.chat.configure(state='disabled')
         self.chat.yview('end')
 
-<<<<<<< Updated upstream
-=======
     def _append_status(self, text):
         self._append_chat(f"[Status] {text}")
 
->>>>>>> Stashed changes
+
     def on_close(self):
         try:
             self.node.close()
         except:
             pass
-<<<<<<< Updated upstream
+
         self.root.destroy()
 
-=======
+
         self.root.destroy()
->>>>>>> Stashed changes
+
