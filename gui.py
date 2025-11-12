@@ -1,196 +1,83 @@
+import socket
+import ssl
+import threading
 import tkinter as tk
 from tkinter import scrolledtext, messagebox
-from network import PeerNode
+from protocol import pack_message, read_message   # <-- dùng file protocol.py
 
-from tkinter import messagebox, scrolledtext
-import socket   
-from network import PeerNode     # Assuming network.py contains P2PNetwork class
+SERVER_HOST = "127.0.0.1"
+SERVER_PORT = 5555
 
-class ChatGUI:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("P2P Chat - No Server")
-        self.node = PeerNode(self.on_message, self.on_status)
+CERT_FILE = "client.crt"
+KEY_FILE = "client.key"
+CA_CERT = "ca.crt"
 
 
-        self.root.title("P2P Chat-No Server (multi-peer)")
-        def safe_on_message(msg):
-            self.root.after(0, lambda: self.on_message(msg))
-        def safe_on_status(status):
-            self.root.after(0, lambda: self.on_status(status))
-        self.node = PeerNode(safe_on_message, safe_on_status)
-        
+class ChatClientGUI:
+    def __init__(self, master):
+        self.master = master
+        master.title("Secure Chat Client (SSL)")
 
-        top = tk.Frame(root); top.pack(padx=8, pady=8, fill='x')
-        tk.Label(top, text="Peer IP:").pack(side='left')
-        self.ip_var = tk.StringVar(value="127.0.0.1")
-        tk.Entry(top, textvariable=self.ip_var, width=15).pack(side='left', padx=4)
-        tk.Label(top, text="Port:").pack(side='left')
-        self.port_var = tk.IntVar(value=5555)
-        tk.Entry(top, textvariable=self.port_var, width=6).pack(side='left', padx=4)
+        self.text_area = scrolledtext.ScrolledText(master, state="disabled", width=50, height=20)
+        self.text_area.pack(pady=10)
 
-        tk.Button(top, text="Start Listening", command=self.start_listen).pack(side='left', padx=6)
-        tk.Button(top, text="Connect", command=self.connect_peer).pack(side='left', padx=6)
+        self.entry = tk.Entry(master, width=40)
+        self.entry.pack(side=tk.LEFT, padx=5, pady=5)
 
-        
-        middle = tk.Frame(root); middle.pack(padx=8, pady=4, fill='both', expand=True)
-        #Peer list
-        peer_frame = tk.Frame(middle)
-        peer_frame.pack(side='left',padx=4,  fill='y')
-        tk.Label(peer_frame, text="Connected Peers:").pack(anchor='w')
-        self.peer_listbox = tk.Listbox(peer_frame, height=8, width=28)
-        self.peer_listbox.pack(side='left', fill='y')
-        peer_btn_frame = tk.Frame(peer_frame)
-        peer_btn_frame.pack(side='left', padx=4, fill='y')
-        tk.Button(peer_btn_frame, text="Refresh", command=self.refresh_peers).pack(fill='x')
-        tk.Button(peer_btn_frame, text="Disconnect", command=self.disconnect_peer).pack(fill= 'x', pady=4)
-        tk.Button(peer_btn_frame, text="Send -> Selected", command=lambda:self.send_to_selected).pack(fill='x')
-        #Chat  window
+        self.send_btn = tk.Button(master, text="Send", command=self.send_message)
+        self.send_btn.pack(side=tk.LEFT)
 
-        self.chat = scrolledtext.ScrolledText(root, state='disabled', wrap='word', height=18)
-        self.chat.pack(padx=8, pady=8, fill='both', expand=True)
+        self.sock = None
+        self.ssl_sock = None
 
-        bottom = tk.Frame(root); bottom.pack(padx=8, pady=8, fill='x')
-        self.entry = tk.Entry(bottom)
-        self.entry.pack(side='left', fill='x', expand=True)
+        self.connect()
 
-        self.entry.bind("<Return>", lambda e: self.send_msg(to_selected=False))
-        tk.Button(bottom, text="Send -> All", command=lambda: self.send_msg(to_selected=False)).pack(side='left', padx=6)
-
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-
-    def _get_local_ip(self):
-        # try to get outbound IP (doesn't actually connect)
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    def connect(self):
+        """Tạo socket và kết nối đến server bằng SSL"""
         try:
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-        finally:
-            s.close()
-        return ip
+            raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def start_listen(self):
-        try:
-            self.node.start_listening(host='0.0.0.0', port=self.port_var.get())
-            self.refresh_peers()
+            context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+            context.load_cert_chain(certfile=CERT_FILE, keyfile=KEY_FILE)
+            context.load_verify_locations(CA_CERT)
+            context.verify_mode = ssl.CERT_REQUIRED
+
+            self.ssl_sock = context.wrap_socket(raw_sock, server_hostname="MyChatServer")
+            self.ssl_sock.connect((SERVER_HOST, SERVER_PORT))
+
+            threading.Thread(target=self.receive_loop, daemon=True).start()
+
+            self.show_message("✅ Connected to server\n")
+
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            messagebox.showerror("Connection failed", str(e))
+            exit(1)
 
-    def connect_peer(self):
-
-        try:
-            self.node.connect_to(self.ip_var.get(), self.port_var.get())
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-
-    def send_msg(self, event=None):
-        text = self.entry.get().strip()
-        if not text: return
-        try:
-            self.node.send_text(text)
-            self.append_chat(f"Me: {text}")
-        ip = self.ip_var.get()
-        port = self.port_var.get()
-        try:
-            new_id = self.node.connect_to(ip, port)
-            self._append_status(f"Connected -> id {new_id}")
-            self.refresh_peers()
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-
-    def refresh_peers(self):
-        self.peer_listbox.delete(0, 'end')
-        peers = self.node.list_peers()
-        for p in peers:
-            display = f"{p.id}: {p.addr[0]}:{p.addr[1]}"
-            self.peer_listbox.insert('end', display)
-
-    def get_selected_peer_id(self):
-        sel = self.peer_listbox.curselection()
-        if not sel:
-            return None
-        text = self.peer_listbox.get(sel[0])
-        # format "id: ip:port"
-        try:
-            id_str = text.split(":")[0]
-            return int(id_str)
-        except:
-            return None
-
-    def disconnect_selected(self):
-        pid = self.get_selected_peer_id()
-        if pid is None:
-            messagebox.showinfo("Info", "Chọn peer để ngắt kết nối")
-            return
-        try:
-            self.node.disconnect_peer(pid)
-            self._append_status(f"Disconnected {pid}")
-            self.refresh_peers()
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-
-    def send_msg(self, to_selected=False):
-        text = self.entry.get().strip()
+    def send_message(self):
+        text = self.entry.get()
         if not text:
             return
+
+        obj = {"type": "chat", "message": text}
+        self.ssl_sock.sendall(pack_message(obj))
+        self.entry.delete(0, tk.END)
+
+    def receive_loop(self):
+        """Nhận liên tục từ server"""
         try:
-            if to_selected:
-                pid = self.get_selected_peer_id()
-                if pid is None:
-                    messagebox.showinfo("Info", "Chọn peer để gửi")
-                    return
-                sent = self.node.send_text(text, target_id=pid)
-                self._append_chat(f"Me -> {pid}: {text}")
-            else:
-                sent = self.node.send_text(text, target_id=None)
-                self._append_chat(f"Me -> ALL: {text}")
-            self.entry.delete(0, 'end')
-        except Exception as e:
-            messagebox.showwarning("Warning", str(e))
+            while True:
+                msg = read_message(self.ssl_sock)
+                self.show_message(f"[Server]: {msg['message']}\n")
+        except Exception:
+            self.show_message("❌ Disconnected from server\n")
+
+    def show_message(self, msg):
+        self.text_area.configure(state="normal")
+        self.text_area.insert(tk.END, msg)
+        self.text_area.configure(state="disabled")
 
 
-    def on_message(self, msg: dict):
-        if msg.get("type") == "msg":
-            self.append_chat(f"Peer: {msg.get('text','')}")
-        else:
-            self.append_chat(f"[{msg}]")
-
-    def on_status(self, text):
-        self.append_chat(f"[Status] {text}")
-
-    def append_chat(self, line):
-
-    # these are scheduled on main thread via safe wrappers in __init__
-    def _on_message_ui(self, msg: dict, conn):
-        # show: Peer {id} (ip:port): text
-        if msg.get("type") == "msg":
-            text = msg.get("text", "")
-            self._append_chat(f"Peer {conn.id} ({conn.addr[0]}:{conn.addr[1]}): {text}")
-        else:
-            self._append_chat(f"[Peer {conn.id}] {msg}")
-
-        # update peer list (in case new connection)
-        self.refresh_peers()
-
-    def _append_chat(self, line):
-
-        self.chat.configure(state='normal')
-        self.chat.insert('end', line + "\n")
-        self.chat.configure(state='disabled')
-        self.chat.yview('end')
-
-    def _append_status(self, text):
-        self._append_chat(f"[Status] {text}")
-
-
-    def on_close(self):
-        try:
-            self.node.close()
-        except:
-            pass
-
-        self.root.destroy()
-
-
-        self.root.destroy()
-
+if __name__ == "__main__":
+    root = tk.Tk()
+    gui = ChatClientGUI(root)
+    root.mainloop()
