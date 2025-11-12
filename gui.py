@@ -54,26 +54,10 @@ class ChatGUI:
         self.entry = tk.Entry(bottom)
         self.entry.pack(side='left', fill='x', expand=True)
 
-        self.entry.bind("<Return>", self.send_msg)
-        tk.Button(bottom, text="Send", command=self.send_msg).pack(side='left', padx=6)
-
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-
-    def start_listen(self):
-        try:
-            self.node.start_listening(port=self.port_var.get())
-
         self.entry.bind("<Return>", lambda e: self.send_msg(to_selected=False))
         tk.Button(bottom, text="Send -> All", command=lambda: self.send_msg(to_selected=False)).pack(side='left', padx=6)
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-        
-                # show local IP
-        try:
-            self.local_ip = self._get_local_ip()
-        except:
-            self.local_ip = "127.0.0.1"
-        self._append_status(f"Local IP: {self.local_ip}")
 
     def _get_local_ip(self):
         # try to get outbound IP (doesn't actually connect)
