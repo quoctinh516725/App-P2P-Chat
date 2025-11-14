@@ -1,83 +1,73 @@
-import socket
-import ssl
-import threading
 import tkinter as tk
 from tkinter import scrolledtext, messagebox
-from protocol import pack_message, read_message   # <-- dùng file protocol.py
+from network import PeerNode
 
-SERVER_HOST = "127.0.0.1"
-SERVER_PORT = 5555
+class ChatGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("P2P Chat - No Server")
+        self.node = PeerNode(self.on_message, self.on_status)
 
-CERT_FILE = "client.crt"
-KEY_FILE = "client.key"
-CA_CERT = "ca.crt"
+        top = tk.Frame(root); top.pack(padx=8, pady=8, fill='x')
+        tk.Label(top, text="Peer IP:").pack(side='left')
+        self.ip_var = tk.StringVar(value="127.0.0.1")
+        tk.Entry(top, textvariable=self.ip_var, width=15).pack(side='left', padx=4)
+        tk.Label(top, text="Port:").pack(side='left')
+        self.port_var = tk.IntVar(value=5555)
+        tk.Entry(top, textvariable=self.port_var, width=6).pack(side='left', padx=4)
 
+        tk.Button(top, text="Start Listening", command=self.start_listen).pack(side='left', padx=6)
+        tk.Button(top, text="Connect", command=self.connect_peer).pack(side='left', padx=6)
 
-class ChatClientGUI:
-    def __init__(self, master):
-        self.master = master
-        master.title("Secure Chat Client (SSL)")
+        self.chat = scrolledtext.ScrolledText(root, state='disabled', wrap='word', height=18)
+        self.chat.pack(padx=8, pady=8, fill='both', expand=True)
 
-        self.text_area = scrolledtext.ScrolledText(master, state="disabled", width=50, height=20)
-        self.text_area.pack(pady=10)
+        bottom = tk.Frame(root); bottom.pack(padx=8, pady=8, fill='x')
+        self.entry = tk.Entry(bottom)
+        self.entry.pack(side='left', fill='x', expand=True)
+        self.entry.bind("<Return>", self.send_msg)
+        tk.Button(bottom, text="Send", command=self.send_msg).pack(side='left', padx=6)
 
-        self.entry = tk.Entry(master, width=40)
-        self.entry.pack(side=tk.LEFT, padx=5, pady=5)
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        self.send_btn = tk.Button(master, text="Send", command=self.send_message)
-        self.send_btn.pack(side=tk.LEFT)
-
-        self.sock = None
-        self.ssl_sock = None
-
-        self.connect()
-
-    def connect(self):
-        """Tạo socket và kết nối đến server bằng SSL"""
+    def start_listen(self):
         try:
-            raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-            context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-            context.load_cert_chain(certfile=CERT_FILE, keyfile=KEY_FILE)
-            context.load_verify_locations(CA_CERT)
-            context.verify_mode = ssl.CERT_REQUIRED
-
-            self.ssl_sock = context.wrap_socket(raw_sock, server_hostname="MyChatServer")
-            self.ssl_sock.connect((SERVER_HOST, SERVER_PORT))
-
-            threading.Thread(target=self.receive_loop, daemon=True).start()
-
-            self.show_message("✅ Connected to server\n")
-
+            self.node.start_listening(port=self.port_var.get())
         except Exception as e:
-            messagebox.showerror("Connection failed", str(e))
-            exit(1)
+            messagebox.showerror("Error", str(e))
 
-    def send_message(self):
-        text = self.entry.get()
-        if not text:
-            return
-
-        obj = {"type": "chat", "message": text}
-        self.ssl_sock.sendall(pack_message(obj))
-        self.entry.delete(0, tk.END)
-
-    def receive_loop(self):
-        """Nhận liên tục từ server"""
+    def connect_peer(self):
         try:
-            while True:
-                msg = read_message(self.ssl_sock)
-                self.show_message(f"[Server]: {msg['message']}\n")
-        except Exception:
-            self.show_message("❌ Disconnected from server\n")
+            self.node.connect_to(self.ip_var.get(), self.port_var.get())
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
-    def show_message(self, msg):
-        self.text_area.configure(state="normal")
-        self.text_area.insert(tk.END, msg)
-        self.text_area.configure(state="disabled")
+    def send_msg(self, event=None):
+        text = self.entry.get().strip()
+        if not text: return
+        try:
+            self.node.send_text(text)
+            self.append_chat(f"Me: {text}")
+            self.entry.delete(0, 'end')
+        except Exception as e:
+            messagebox.showwarning("Warning", str(e))
 
+    def on_message(self, msg: dict):
+        if msg.get("type") == "msg":
+            self.append_chat(f"Peer: {msg.get('text','')}")
+        else:
+            self.append_chat(f"[{msg}]")
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    gui = ChatClientGUI(root)
-    root.mainloop()
+    def on_status(self, text):
+        self.append_chat(f"[Status] {text}")
+
+    def append_chat(self, line):
+        self.chat.configure(state='normal')
+        self.chat.insert('end', line + "\n")
+        self.chat.configure(state='disabled')
+        self.chat.yview('end')
+
+    def on_close(self):
+        self.node.close()
+        self.root.destroy()
+
