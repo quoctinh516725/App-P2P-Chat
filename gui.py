@@ -72,7 +72,7 @@ class ChatGUI:
 
     def start_listen(self):
         try:
-            self.node.start_listening(port=self.port_var.get())
+            self.node.start_listening(host=self.ip_var.get(), port=self.port_var.get())
             self.append_chat("[Status] Listening...")
         except Exception as e:
             messagebox.showerror("Error", str(e))

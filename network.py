@@ -54,9 +54,20 @@ class ConnectionHandler:
         self.aes_key = aes_key
 
     def _perform_client_handshake(self):
+        # Bước 1: Đọc tin nhắn đầu tiên
         msg = read_message(self.sock)
+        
+        # Server hiện tại được code để gửi PubKey của nó trước.
+        # Nếu nhận được pubkey, chúng ta cần đọc tiếp gói tin tiếp theo (chứa aes_key)
+        if msg.get("type") == "pubkey":
+            # (Tùy chọn) Bạn có thể lưu msg["pem"] nếu muốn xác thực Server sau này
+            # Hiện tại ta bỏ qua và đọc tin nhắn tiếp theo
+            msg = read_message(self.sock)
+
+        # Bước 2: Kiểm tra xem tin nhắn hiện tại có phải là aes_key không
         if msg.get("type") != "aes_key":
-            raise RuntimeError("Expected aes_key from server")
+            raise RuntimeError(f"Expected aes_key from server, got {msg.get('type')}")
+            
         encrypted = b64_decode(msg["data"])
         rsa_cipher = PKCS1_OAEP.new(self.owner.rsa_key)
         self.aes_key = rsa_cipher.decrypt(encrypted)
