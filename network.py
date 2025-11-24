@@ -16,12 +16,13 @@ def json_loads(b: bytes) -> dict:
     return json.loads(b.decode('utf-8'))
 
 class ConnectionHandler:
-    def __init__(self, sock: socket.socket, addr, owner):
+    def __init__(self, sock: socket.socket, addr, owner, is_server_side: bool):
         self.sock = sock
         self.addr = addr
         self.owner = owner
         self.running = True
         self.aes_key = None
+        self.is_server_side = is_server_side
         self.lock = threading.Lock()
         threading.Thread(target=self._recv_loop, daemon=True).start()
 
@@ -127,8 +128,7 @@ class PeerNode:
         while self.running:
             try:
                 conn, addr = self.server_sock.accept()
-                handler = ConnectionHandler(conn, addr, owner=self)
-                handler.is_server_side = True
+                handler = ConnectionHandler(conn, addr, owner=self, is_server_side=True)
                 with self.lock:
                     self.handlers[addr] = handler
                 self.ui_on_status(f"Incoming connection from {addr}")
@@ -141,8 +141,7 @@ class PeerNode:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((ip, port))
         addr = sock.getpeername()
-        handler = ConnectionHandler(sock, addr, owner=self)
-        handler.is_server_side = False
+        handler = ConnectionHandler(sock, addr, owner=self, is_server_side=False)
         with self.lock:
             self.handlers[addr] = handler
         self.ui_on_status(f"Connected to {addr}")
