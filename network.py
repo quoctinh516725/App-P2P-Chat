@@ -89,6 +89,8 @@ class ConnectionHandler:
                     self.owner._handle_decrypted(self, inner)
                 else:
                     self.owner._handle_control(self, msg)
+        except ConnectionError as e:
+            self.owner._on_connection_error(self, e)
         except Exception as e:
             traceback.print_exc()
             self.owner._on_connection_error(self, e)
