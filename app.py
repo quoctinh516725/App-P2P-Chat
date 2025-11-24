@@ -1,9 +1,10 @@
+#app.py
 import tkinter as tk
-from gui import ChatGUI
+from gui import LoginGUI
 
 def main():
     root = tk.Tk()
-    ChatGUI(root)
+    LoginGUI(root)
     root.mainloop()
 
 if __name__ == "__main__":
